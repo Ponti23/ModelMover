@@ -31,7 +31,6 @@ def generate_list(mesh):
 
 
 def combine_mesh(mesh, combine_list):
-    print("COMBINING MESH")
     if isinstance(mesh, trimesh.Scene):
         # Collect the submeshes you want to combine
         mesh_to_combine = []
@@ -39,20 +38,20 @@ def combine_mesh(mesh, combine_list):
         for idx, submesh in enumerate(mesh.geometry.values()):
             if counter in combine_list:
                 mesh_to_combine.append(submesh)
-                print(f"Adding submesh {idx + 1} to combine list")
+                #print(f"Adding submesh {idx + 1} to combine list")
             counter += 1
 
         # Combine the collected meshes
-        if len(mesh_to_combine) >= 2:
+        if len(mesh_to_combine) >= 1:
             combined_mesh = trimesh.util.concatenate(mesh_to_combine)
             print("Meshes combined successfully!")
             return combined_mesh
         else:
             print("Not enough meshes to combine!")
-            return None
-    else:
-        print("Single mesh detected!")
-        return None
+            return mesh
+    #else:
+        #print("Single mesh detected!")
+        #return mesh
 
     
 

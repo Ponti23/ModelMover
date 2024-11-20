@@ -14,7 +14,6 @@ import multiprocessing
 import trimesh
 def run_pyglet_viewer(mesh, my_list):
     try:
-        print("SHOWING PYGLET")
         # If you want to display the mesh using Pyglet:
         combined_mesh = combine_mesh(mesh, my_list)  # Make sure this function is defined correctly
         combined_mesh.show()  # This uses Pyglet for rendering
@@ -66,6 +65,32 @@ class MainWindow(QMainWindow):
         self.object_list_label = self.findChild(QLabel, "object_list_label")
         self.group_list_label = self.findChild(QLabel, "group_list_label")
 
+        self.viewer_tracker = {}
+
+
+# IMPORTING FILES
+    def import_file(self):
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Wavefront OBJ Files (*.obj)")
+            self.loaded_mesh = load_mesh(file_path)
+            self.loaded_groups = generate_list(self.loaded_mesh)
+            self.object_list.clear()  # Removes all items from the object_list
+            for current in self.loaded_groups:
+                self.object_list.addItem(str(current))
+            
+            if self.selected_objects_all_groups != None:
+                print(self.selected_objects_all_groups)
+                print("SAVE FIRST")
+                self.selected_objects_all_groups.clear()
+                self.group_list.clear()
+                
+                self.add_group_item = QListWidgetItem("Add Group")
+                self.group_list.addItem(self.add_group_item)
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+# RIGHT CLICK LIST BEHAVIORS
     def show_context_menu(self, position):
         # Get the item at the clicked position
         selected_item = self.group_list.itemAt(position)
@@ -101,35 +126,75 @@ class MainWindow(QMainWindow):
                         self.selected_objects_all_groups.discard(obj)  # Remove from selected objects list
                     print(f"Group '{group_name}' has been removed, and its objects are now available for selection.")
 
+                    self.close_window(group_name)
+
             # Handle the "Add Objects" action
             elif action == add_objects_action:
                 self.show_add_objects_dialog(selected_item)
 
             # Handle the "Rename" action
             elif action == rename_action:
-                new_name, ok = QInputDialog.getText(self, "Rename Group", "Enter new name for the group:", text=selected_item.text())
+                old_name = selected_item.text()  # Store the old name before renaming
+                new_name, ok = QInputDialog.getText(self, "Rename Group", "Enter new name for the group:", text=old_name)
                 if ok and new_name:
+                    if new_name in self.group_objects:
+                        QMessageBox.warning(self, "Error", "A group with this name already exists.")
+                        return
                     selected_item.setText(new_name)
                     # Update the group_objects dictionary to reflect the renamed group
-                    if selected_item.text() in self.group_objects:
-                        self.group_objects[new_name] = self.group_objects.pop(selected_item.text())
+                    self.group_objects[new_name] = self.group_objects.pop(old_name)
+                    self.close_window(old_name)
                 elif not new_name:
                     QMessageBox.warning(self, "Warning", "Group name cannot be empty.")
 
-            elif action == preview_action:
-                print("PREVIEWING THE GROUP")
-                group_objects = self.group_objects.get(group_name, [])
-                if group_objects != []:
-                    int_list = [int(item) for item in group_objects]
-                    new_mesh = combine_mesh(self.loaded_mesh, int_list)
-                    viewer_process = multiprocessing.Process(target=run_pyglet_viewer, args=(self.loaded_mesh, int_list))
-                    viewer_process.start()
-                    # Ensure new_mesh is a top-level window and movable
-                    #ew_mesh.setWindowFlags(Qt.Window)  # Make it a top-level window
-                    #new_mesh.show()
-                else:
-                    print("group empty")
 
+            elif action == preview_action:
+                group_name = selected_item.text()
+                group_objects = self.group_objects.get(group_name, [])
+                self.preview_group(group_name, group_objects)
+
+    def close_window(self, group_name):
+        print(f'closing group: {group_name}')
+        process = self.viewer_tracker[group_name]
+        if process.is_alive():
+            process.terminate()
+            process.join()
+
+
+# OPENNING A PREVIEW
+    def preview_group(self, group_name, group_objects):
+        print(f"PREVIEWING THE GROUP: {group_name} WITH OBJECTS: {group_objects}")
+        
+        if group_objects != []:
+            if group_name in self.viewer_tracker:
+                existing_process = self.viewer_tracker[group_name]
+                if existing_process.is_alive():
+                    print(f"Terminating {group_name}")
+                    existing_process.terminate()
+                    existing_process.join()
+
+            int_list = [int(item) for item in group_objects]
+            viewer_process = multiprocessing.Process(target=run_pyglet_viewer, args=(self.loaded_mesh, int_list))
+            viewer_process.start()
+            self.viewer_tracker[group_name] = viewer_process  # Use `group_name` as the key in the dictionary
+        else:
+            print("Group empty")
+
+        print(f"Tracker status: {self.viewer_tracker}")
+
+    def close_all_viewers(self):
+        for group_objects, process in self.viewer_tracker.items():
+            if process.is_alive():
+                print(f"Terminating {group_objects}.")
+                process.terminate()
+                process.join()
+        self.viewer_tracker.clear()
+
+    def closeEvent(self, event):
+        self.close_all_viewers()
+        event.accept()
+
+# CHECKBOX FOR ADDING STUFF
     def show_add_objects_dialog(self, selected_item):
         # Get the group name
         group_name = selected_item.text()
@@ -170,13 +235,22 @@ class MainWindow(QMainWindow):
 
         # Add a button to confirm the selection
         confirm_button = QPushButton("Confirm", dialog)
-        confirm_button.clicked.connect(lambda: self.add_selected_objects(group_name, checkboxes))
+        confirm_button.clicked.connect(lambda: self.confirm_selection(dialog, group_name, checkboxes))
         layout.addWidget(confirm_button)
 
         dialog.setLayout(layout)
         dialog.exec_()
 
+    def confirm_selection(self, dialog, group_name, checkboxes):
+        """Handle the confirmation of selected objects."""
+        self.add_selected_objects(group_name, checkboxes)
+        dialog.accept()  # This will close the dialog
+
+
+# ADDING TO A GROUP
     def add_selected_objects(self, group_name, checkboxes):
+        if group_name in self.viewer_tracker:
+            self.close_window(group_name)
         # Get the selected objects (those that are checked)
         selected_objects = [obj for checkbox, obj in checkboxes.items() if checkbox.isChecked()]
         
@@ -210,12 +284,11 @@ class MainWindow(QMainWindow):
 
         # Print the available (unassigned) objects
         print(f"Available (unassigned) objects: {available_objects}")
+        #print(f"Selected objects: {self.selected_objects_all_groups}")
+        print(f"All Groups: {self.group_objects}")
+ 
 
-        print(f"available: ")
-        print(f"selected objects: {self.selected_objects_all_groups}")
-        print(f"groups: {self.group_objects}")
-
-
+# LIST BEHAVIOURS WHEN CLICKING
     def on_group_item_clicked(self, item):
         # Only handle the "Add Group" item for adding new groups
         if item == self.add_group_item:
@@ -234,51 +307,17 @@ class MainWindow(QMainWindow):
         
         if item != self.add_group_item:
             group_name = item.text()  # Get the name of the selected group
-            
-            # Get the objects associated with this group from the dictionary
             group_objects = self.group_objects.get(group_name, [])
             print(f"Group '{group_name}' contains the following objects: {group_objects}")
-            self.preview_group(group_objects)
-
-    def preview_group(self, group_objects):
-        print("PREVIEWING THE GROUP")
-
-        if group_objects != []:
-            int_list = [int(item) for item in group_objects]
-            new_mesh = combine_mesh(self.loaded_mesh, int_list)
-            viewer_process = multiprocessing.Process(target=run_pyglet_viewer, args=(self.loaded_mesh, int_list))
-            viewer_process.start()
-            # Ensure new_mesh is a top-level window and movable
-            #ew_mesh.setWindowFlags(Qt.Window)  # Make it a top-level window
-            #new_mesh.show()
-        else:
-            print("group empty")
+            #self.preview_group(group_name, group_objects)
 
 
-
-
-    def import_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Wavefront OBJ Files (*.obj)")
-        self.loaded_mesh = load_mesh(file_path)
-        self.loaded_groups = generate_list(self.loaded_mesh)
-        self.object_list.clear()  # Removes all items from the object_list
-        for current in self.loaded_groups:
-            self.object_list.addItem(str(current))
-        
-        if self.selected_objects_all_groups != None:
-            print(self.selected_objects_all_groups)
-            print("SAVE FIRST")
-            self.selected_objects_all_groups.clear()
-            self.group_list.clear()
-            
-            self.add_group_item = QListWidgetItem("Add Group")
-            self.group_list.addItem(self.add_group_item)
         
         
-
+### TBA
 
     def export_file(self):
-        view_mesh(self.loaded_mesh, [0, 19])
+        pass
 
     def create_property_window(self):
         """Create the floating property window on the top-right corner."""
@@ -304,5 +343,5 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.set_openGL_info(1, 2)
+    #window.set_openGL_info(1, 2)
     sys.exit(app.exec_())
