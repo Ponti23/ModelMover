@@ -311,13 +311,45 @@ class MainWindow(QMainWindow):
             print(f"Group '{group_name}' contains the following objects: {group_objects}")
             #self.preview_group(group_name, group_objects)
 
+            print(f"All Groups: {self.group_objects}")
 
-        
-        
-### TBA
-
+            
+            
+    ### TBA
     def export_file(self):
-        pass
+        try:
+            # Open a file dialog to allow the user to choose filename and location
+            options = QFileDialog.Options()
+            file_name, _ = QFileDialog.getSaveFileName(
+                None,  # Parent widget (None for standalone dialog)
+                "Save OBJ File",  # Dialog title
+                "",  # Default directory (empty will start from the last directory)
+                "OBJ Files (*.obj);;All Files (*)",  # File filter for dialog
+                options=options
+            )
+
+            # Check if a file was selected
+            if file_name:
+                # Ensure the file ends with ".obj" if the user doesn't add it
+                if not file_name.lower().endswith('.obj'):
+                    file_name += '.obj'
+
+                # Create a new scene
+                scene = trimesh.Scene()
+
+                # Add geometry to the scene based on your groups
+                for group_name, group_list in self.group_objects.items():
+                    print(f'Group: {group_name} Group_list: {group_list}')
+                    combined_mesh = combine_mesh(self.loaded_mesh, group_list)
+                    scene.add_geometry(combined_mesh, node_name=group_name)
+
+                # Export the scene to the selected file
+                scene.export(file_name, file_type='obj')
+                print(f"Scene exported to '{file_name}'")
+
+        except Exception as e:
+            print(f"Error: {e}")
+
 
     def create_property_window(self):
         """Create the floating property window on the top-right corner."""
