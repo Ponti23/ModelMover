@@ -25,9 +25,12 @@ def view_mesh(mesh, combine_list):
 
 
 def generate_list(mesh):
-    groups = []
-    groups = list(range(len(mesh.geometry)))
-    return groups
+    if isinstance(mesh, trimesh.Trimesh):
+        return ['0']
+    else:
+        groups = []
+        groups = list(range(len(mesh.geometry)))
+        return groups
 
 
 def combine_mesh(mesh, combine_list):
@@ -49,9 +52,9 @@ def combine_mesh(mesh, combine_list):
         else:
             print("Not enough meshes to combine!")
             return mesh
-    #else:
-        #print("Single mesh detected!")
-        #return mesh
+    else:
+        print("Single mesh detected!")
+        return mesh
 
     
 

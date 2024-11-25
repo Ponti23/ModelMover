@@ -23,16 +23,10 @@ def run_pyglet_viewer(mesh, my_list):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         # Load the main UI from the 'main.ui'
-        loadUi("main.ui", self)
-
-        # Create the OpenGL widget (model_viewer)
-        self.model_viewer = self.findChild(QOpenGLWidget, "model_viewer")
-        self.model_viewer.setStyleSheet("background-color: gray;")
-
-        # Create the property window on top of OpenGL
-        self.create_property_window()
+        loadUi("new_main.ui", self)
 
         # Show the main window
         self.show()
@@ -44,20 +38,21 @@ class MainWindow(QMainWindow):
         self.export_button.clicked.connect(self.export_file)
 
         self.object_list = self.findChild(QListWidget, "object_list")
-        
         self.group_list = self.findChild(QListWidget, "group_list")
+
+
         #self.add_group_item = QListWidgetItem("Add Group")
         #self.group_list.addItem(self.add_group_item)
         
         # Create a dictionary to store the selected objects for each group
-        self.group_objects = {}
+        self.all_groups = {}
 
         # Track all selected objects across groups
         self.selected_objects_all_groups = set()
 
         # Connect single-click to handle the "Add Group" item
         self.group_list.itemClicked.connect(self.on_group_item_clicked)
-        
+        self.object_list.itemClicked.connect(self.on_object_item_clicked)
         # Enable custom context menu on the list widget
         self.group_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.group_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -72,6 +67,7 @@ class MainWindow(QMainWindow):
     def import_file(self):
         try:
             file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Wavefront OBJ Files (*.obj)")
+            self.all_groups = {}
             self.loaded_mesh = load_mesh(file_path)
             self.loaded_groups = generate_list(self.loaded_mesh)
             self.object_list.clear()  # Removes all items from the object_list
@@ -119,7 +115,7 @@ class MainWindow(QMainWindow):
                     # Remove the selected item
                     self.group_list.takeItem(self.group_list.row(selected_item))
                     # Also remove the group from the dictionary
-                    objects_in_group = self.group_objects.pop(group_name, [])
+                    objects_in_group = self.all_groups.pop(group_name, [])
                     
                     # Add objects from the removed group back to the available objects
                     for obj in objects_in_group:
@@ -137,12 +133,12 @@ class MainWindow(QMainWindow):
                 old_name = selected_item.text()  # Store the old name before renaming
                 new_name, ok = QInputDialog.getText(self, "Rename Group", "Enter new name for the group:", text=old_name)
                 if ok and new_name:
-                    if new_name in self.group_objects:
+                    if new_name in self.all_groups:
                         QMessageBox.warning(self, "Error", "A group with this name already exists.")
                         return
                     selected_item.setText(new_name)
                     # Update the group_objects dictionary to reflect the renamed group
-                    self.group_objects[new_name] = self.group_objects.pop(old_name)
+                    self.all_groups[new_name] = self.all_groups.pop(old_name)
                     self.close_window(old_name)
                 elif not new_name:
                     QMessageBox.warning(self, "Warning", "Group name cannot be empty.")
@@ -150,7 +146,7 @@ class MainWindow(QMainWindow):
 
             elif action == preview_action:
                 group_name = selected_item.text()
-                group_objects = self.group_objects.get(group_name, [])
+                group_objects = self.all_groups.get(group_name, [])
                 self.preview_group(group_name, group_objects)
 
     def close_window(self, group_name):
@@ -200,7 +196,7 @@ class MainWindow(QMainWindow):
         group_name = selected_item.text()
 
         # Get all the objects already added to the group
-        selected_objects_in_group = set(self.group_objects.get(group_name, []))
+        selected_objects_in_group = set(self.all_groups.get(group_name, []))
 
         # Create a dialog to select multiple objects from the object_list
         dialog = QDialog(self)
@@ -257,17 +253,17 @@ class MainWindow(QMainWindow):
         # If no objects are selected (i.e., all checkboxes are unchecked)
         if not selected_objects:
             # If we uncheck everything, clear the group (empty list)
-            self.group_objects[group_name] = []
+            self.all_groups[group_name] = []
             print(f"Group '{group_name}' now has no objects.")
         else:
             # If there are selected objects, update the group with them
-            self.group_objects[group_name] = selected_objects
+            self.all_groups[group_name] = selected_objects
 
         # Update the global list of selected objects to reflect the changes
         self.selected_objects_all_groups = set()  # Clear the global list
 
         # Rebuild the global list of selected objects (this list should now reflect all selected objects in the groups)
-        for group in self.group_objects.values():
+        for group in self.all_groups.values():
             self.selected_objects_all_groups.update(group)
 
         # Optionally, print the updated objects in the group
@@ -285,10 +281,10 @@ class MainWindow(QMainWindow):
         # Print the available (unassigned) objects
         print(f"Available (unassigned) objects: {available_objects}")
         #print(f"Selected objects: {self.selected_objects_all_groups}")
-        print(f"All Groups: {self.group_objects}")
+        print(f"All Groups: {self.all_groups}")
  
 
-# LIST BEHAVIOURS WHEN CLICKING
+# LIST OF THE GROUPS AVAILABLE
     def on_group_item_clicked(self, item):
         # Only handle the "Add Group" item for adding new groups
         if item == self.add_group_item:
@@ -301,19 +297,27 @@ class MainWindow(QMainWindow):
                 else:
                     # Add the new group as an item in the list
                     self.group_list.addItem(new_group_name)
-                    self.group_objects[new_group_name] = []  # Initialize an empty list for this group
+                    self.all_groups[new_group_name] = []  # Initialize an empty list for this group
             elif not new_group_name:
                 QMessageBox.warning(self, "Warning", "Group name cannot be empty.")
         
         if item != self.add_group_item:
             group_name = item.text()  # Get the name of the selected group
-            group_objects = self.group_objects.get(group_name, [])
+            group_objects = self.all_groups.get(group_name, [])
             print(f"Group '{group_name}' contains the following objects: {group_objects}")
             #self.preview_group(group_name, group_objects)
 
-            print(f"All Groups: {self.group_objects}")
+            print(f"All Groups: {self.all_groups}")
 
-            
+# LIST OF THE OBJECT AVAILABLE
+    def on_object_item_clicked(self, item):
+        selected_object = item.text()  # Get the name of the selected group
+        selected_object = selected_object.split('_')[-1]
+        selected_object = int(selected_object)
+        print(f"Selected Object: {selected_object}")
+        list = []
+        list.append(selected_object)
+        self.preview_group('SELECTED OBJECT', list)            
             
     ### TBA
     def export_file(self):
@@ -338,9 +342,10 @@ class MainWindow(QMainWindow):
                 scene = trimesh.Scene()
 
                 # Add geometry to the scene based on your groups
-                for group_name, group_list in self.group_objects.items():
+                for group_name, group_list in self.all_groups.items():
                     print(f'Group: {group_name} Group_list: {group_list}')
-                    combined_mesh = combine_mesh(self.loaded_mesh, group_list)
+                    int_list = [int(item) for item in group_list]
+                    combined_mesh = combine_mesh(self.loaded_mesh, int_list)
                     scene.add_geometry(combined_mesh, node_name=group_name)
 
                 # Export the scene to the selected file
@@ -350,27 +355,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error: {e}")
 
-
-    def create_property_window(self):
-        """Create the floating property window on the top-right corner."""
-        self.property_window = QWidget(self)
-        loadUi("property_window.ui", self.property_window)
-        opengl_geometry = self.model_viewer.geometry()
-        property_window_width, property_window_height = 409, 139
-        x_position = opengl_geometry.right() - property_window_width
-        y_position = opengl_geometry.top()
-        self.property_window.setGeometry(x_position+240, y_position+25, property_window_width, property_window_height)
-        self.property_window.setStyleSheet("background-color: rgba(255, 255, 255, 230);")
-        self.property_window.raise_()
-        self.property_window.show()
-
-    def set_openGL_info(self, object_num, group_num):
-        """Function to update the property window information."""
-        object_label = self.property_window.findChild(QLabel, "object_number")
-        group_label = self.property_window.findChild(QLabel, "group_number")
-        if object_label and group_label:
-            object_label.setText(str(object_num))
-            group_label.setText(str(group_num))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
