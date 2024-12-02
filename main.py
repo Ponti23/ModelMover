@@ -16,9 +16,13 @@ def run_pyglet_viewer(mesh, my_list):
     try:
         # If you want to display the mesh using Pyglet:
         combined_mesh = combine_mesh(mesh, my_list)  # Make sure this function is defined correctly
-        combined_mesh.show()  # This uses Pyglet for rendering
+        combined_mesh.show(resolution = (600, 300))  # This uses Pyglet for rendering
     except Exception as e:
         print(f"Error: {e}")
+
+from PyQt5.QtWidgets import QDesktopWidget
+
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -27,6 +31,7 @@ class MainWindow(QMainWindow):
 
         # Load the main UI from the 'main.ui'
         loadUi("new_main.ui", self)
+        self.center_window()
 
         # Show the main window
         self.show()
@@ -36,6 +41,8 @@ class MainWindow(QMainWindow):
 
         self.export_button = self.findChild(QPushButton, "export_button")
         self.export_button.clicked.connect(self.export_file)
+
+        self.check_box = self.findChild(QCheckBox, 'checkBox')
 
         self.object_list = self.findChild(QListWidget, "object_list")
         self.group_list = self.findChild(QListWidget, "group_list")
@@ -62,6 +69,19 @@ class MainWindow(QMainWindow):
 
         self.viewer_tracker = {}
 
+    def center_window(self):
+        # Get the screen's available geometry
+        screen_geometry = QDesktopWidget().availableGeometry()
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+
+        # Set the window's position slightly to the right of the screen's center
+        window_width = self.width()
+        window_height = self.height()
+        x = screen_width // 2 + 600  # 100 pixels to the right of the center
+        y = (screen_height - 500 - window_height) // 2  # Center vertically
+
+        self.move(x, y)
 
 # IMPORTING FILES
     def import_file(self):
@@ -317,7 +337,7 @@ class MainWindow(QMainWindow):
         print(f"Selected Object: {selected_object}")
         list = []
         list.append(selected_object)
-        self.preview_group('SELECTED OBJECT', list)            
+        self.preview_group(selected_object, list)            
             
     ### TBA
     def export_file(self):
@@ -349,6 +369,9 @@ class MainWindow(QMainWindow):
                     scene.add_geometry(combined_mesh, node_name=group_name)
 
                 # Export the scene to the selected file
+                if self.check_box.isChecked():
+                    scene.apply_scale(0.01)
+                    print('SCALED TO METERS')
                 scene.export(file_name, file_type='obj')
                 print(f"Scene exported to '{file_name}'")
 

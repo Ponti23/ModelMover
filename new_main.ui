@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>306</width>
-    <height>371</height>
+    <height>470</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -128,6 +128,66 @@
            <pointsize>13</pointsize>
           </font>
          </property>
+        </widget>
+       </item>
+       <item alignment="Qt::AlignRight">
+        <widget class="QFrame" name="frame_3">
+         <property name="minimumSize">
+          <size>
+           <width>131</width>
+           <height>30</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>131</width>
+           <height>41</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>1</pointsize>
+          </font>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
+         </property>
+         <widget class="QCheckBox" name="checkBox">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>10</y>
+            <width>111</width>
+            <height>17</height>
+           </rect>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>111</width>
+            <height>17</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>111</width>
+            <height>17</height>
+           </size>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>10</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>Scale to Meters</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
         </widget>
        </item>
        <item>
