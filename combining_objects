@@ -1,9 +1,0 @@
-import trimesh
-
-def load_mesh(filename):
-    try:
-        print("Mesh Loaded Succesfully")
-        mesh = trimesh.load_mesh(filename)
-        return mesh
-    except:
-        print("Error Occured")
